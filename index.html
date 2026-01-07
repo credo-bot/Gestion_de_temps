@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Time Control</title>
+
+<style>
+:root{
+--bg:#0f172a;
+--card:#111827;
+--primary:#6366f1;
+--accent:#22c55e;
+--danger:#ef4444;
+--text:#e5e7eb;
+--muted:#94a3b8;
+}
+
+*{box-sizing:border-box}
+
+body{
+margin:0;
+font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+background:linear-gradient(180deg,#020617,#0f172a);
+color:var(--text);
+padding:16px;
+}
+
+h1,h2{
+margin:8px 0;
+text-align:center;
+font-weight:600;
+}
+
+.app{
+max-width:430px;
+margin:auto;
+}
+
+.card{
+background:rgba(17,24,39,.9);
+border-radius:18px;
+padding:16px;
+margin-bottom:14px;
+box-shadow:0 10px 30px rgba(0,0,0,.4);
+}
+
+input,select,button{
+width:100%;
+padding:12px;
+margin:6px 0;
+border-radius:12px;
+border:none;
+background:#020617;
+color:var(--text);
+font-size:15px;
+}
+
+button{
+background:linear-gradient(135deg,var(--primary),#4338ca);
+font-weight:600;
+cursor:pointer;
+}
+
+button:active{transform:scale(.98)}
+
+.task{
+display:flex;
+align-items:center;
+gap:10px;
+padding:12px;
+border-radius:14px;
+background:#020617;
+margin-bottom:8px;
+}
+
+.task.done{opacity:.5;text-decoration:line-through}
+
+.time{font-size:12px;color:var(--muted)}
+
+.badge{
+padding:4px 8px;
+border-radius:999px;
+font-size:11px;
+background:var(--primary);
+}
+
+.timeline{
+border-left:3px solid var(--primary);
+padding-left:10px;
+}
+
+.stat{
+text-align:center;
+font-size:20px;
+font-weight:700;
+margin-top:10px;
+}
+
+footer{
+text-align:center;
+font-size:12px;
+color:var(--muted);
+margin-top:10px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="app">
+
+<h1>⏱ Time Control</h1>
+
+<div class="card">
+<input type="date" id="date">
+<input type="time" id="heure">
+<input type="number" id="duree" placeholder="Durée (minutes)">
+<select id="importance">
+<option value="1">Importance faible</option>
+<option value="2">Importance moyenne</option>
+<option value="3">Importance élevée</option>
+</select>
+<input type="text" id="nom" placeholder="Nom de la tâche">
+<button onclick="ajouter()">Ajouter la tâche</button>
+</div>
+
+<div class="card">
+<h2>📋 Aujourd’hui</h2>
+<div id="liste"></div>
+</div>
+
+<div class="card">
+<h2>⏳ Timeline</h2>
+<div id="timeline" class="timeline"></div>
+</div>
+
+<div class="card">
+<h2>📊 Score du jour</h2>
+<div id="stats" class="stat">0%</div>
+</div>
+
+<footer>
+Discipline > Motivation
+</footer>
+
+</div>
+
+<script>
+if(Notification.permission!=="granted"){Notification.requestPermission();}
+let taches=JSON.parse(localStorage.getItem("taches"))||[];
+const save=()=>localStorage.setItem("taches",JSON.stringify(taches));
+
+function ajouter(){
+let d=date.value,h=heure.value,du=parseInt(duree.value),n=nom.value,i=parseInt(importance.value);
+if(!d||!h||!du||!n)return;
+let [hh,mm]=h.split(":").map(Number);
+let fm=hh*60+mm+du;
+let fin=`${String(Math.floor(fm/60)).padStart(2,"0")}:${String(fm%60).padStart(2,"0")}`;
+taches.push({id:Date.now(),date:d,debut:h,fin,nom:n,fait:false,importance:i});
+save();render();programmerNotif(d,h,n);nom.value="";
+}
+
+function programmerNotif(d,h,n){
+let now=new Date();
+let [hh,mm]=h.split(":").map(Number);
+let x=new Date(d);x.setHours(hh,mm,0,0);
+let delay=x-now;
+if(delay>0)setTimeout(()=>new Notification("⏰ "+n),delay);
+}
+
+function toggle(id){
+let t=taches.find(x=>x.id===id);
+t.fait=!t.fait;save();render();
+}
+
+function render(){
+liste.innerHTML="";timeline.innerHTML="";
+let today=new Date().toISOString().split("T")[0];
+let j=taches.filter(t=>t.date===today).sort((a,b)=>a.debut.localeCompare(b.debut));
+
+let total=j.reduce((s,t)=>s+t.importance,0);
+let fait=j.filter(t=>t.fait).reduce((s,t)=>s+t.importance,0);
+stats.textContent=total?Math.round((fait/total)*100)+"%":"0%";
+
+j.forEach(t=>{
+let div=document.createElement("div");
+div.className="task"+(t.fait?" done":"");
+div.innerHTML=`
+<input type="checkbox" ${t.fait?"checked":""} onchange="toggle(${t.id})">
+<div>
+<strong>${t.nom}</strong>
+<div class="time">${t.debut} → ${t.fin}</div>
+</div>
+<span class="badge">${t.importance}</span>
+`;
+liste.appendChild(div);
+
+let tl=document.createElement("div");
+tl.innerHTML=`<strong>${t.debut}-${t.fin}</strong> ${t.nom}`;
+timeline.appendChild(tl);
+});
+}
+
+setInterval(()=>{
+let now=new Date();
+if(now.getHours()===22&&now.getMinutes()===0){
+new Notification("📊 Bilan du jour",{body:stats.textContent+" accompli"});
+}
+},60000);
+
+render();
+</script>
+
+</body>
+</html>
